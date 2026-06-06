@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Contactos</h1>
+
+<!-- Teléfono de emergencias -->
+<div class="card">
+  <h2>Teléfono de emergencias</h2>
+  <p style="font-size:0.88rem; color:#718096; margin-bottom:1rem;">
+    Número que se marcará cuando el mayor pida ayuda de emergencia o se detecte una caída.
+  </p>
+  <form method="post" action="/contacts/emergency" style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+    <div class="form-group" style="flex:1; min-width:200px;">
+      <label for="phone">Número de teléfono</label>
+      <input type="tel" id="phone" name="phone"
+             value="{{ emergency_phone }}"
+             placeholder="112" required
+             style="font-size:1.1rem; font-weight:700; letter-spacing:0.05em;">
+    </div>
+    <button type="submit" class="btn btn-primary" style="padding:0.55rem 1.2rem;">
+      Guardar
+    </button>
+  </form>
+</div>
+
+<!-- Contactos familiares / amigos -->
+<div class="card">
+  <h2>Familiares y amigos</h2>
+  <p style="font-size:0.88rem; color:#718096; margin-bottom:1rem;">
+    El mayor puede decir "Llama a [nombre]" para marcar a cualquiera de estos contactos.
+  </p>
+
+  {% if contacts %}
+  <table style="margin-bottom:1.5rem;">
+    <thead>
+      <tr><th>Nombre</th><th>Teléfono</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for c in contacts %}
+      <tr>
+        <td style="font-weight:600;">{{ c.name }}</td>
+        <td style="font-family:monospace;">{{ c.phone }}</td>
+        <td>
+          <form method="post" action="/contacts/{{ loop.index0 }}/delete"
+                onsubmit="return confirm('¿Eliminar a {{ c.name }}?')">
+            <button type="submit" class="btn btn-danger" style="padding:0.3rem 0.7rem; font-size:0.8rem;">
+              Eliminar
+            </button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state" style="padding:1.5rem;">
+    <div class="icon">👤</div>
+    No hay contactos añadidos todavía.
+  </div>
+  {% endif %}
+
+  <!-- Añadir contacto -->
+  <form method="post" action="/contacts/add">
+    <div class="form-grid">
+      <div class="form-group">
+        <label for="name">Nombre</label>
+        <input type="text" id="name" name="name" required placeholder="María, hijo, médico…">
+        <small>El mayor usará este nombre para llamar: "Llama a María"</small>
+      </div>
+      <div class="form-group">
+        <label for="cphone">Teléfono</label>
+        <input type="tel" id="cphone" name="phone" required placeholder="+34600000000">
+      </div>
+      <div class="form-group form-full" style="display:flex; justify-content:flex-end;">
+        <button type="submit" class="btn btn-primary">
+          ➕ Añadir contacto
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}

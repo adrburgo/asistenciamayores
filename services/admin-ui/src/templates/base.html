@@ -160,6 +160,7 @@
     <span class="brand">🏠 Asistencia Mayores</span>
     <a href="/" class="{{ 'active' if active == 'dashboard' else '' }}">Panel</a>
     <a href="/cameras" class="{{ 'active' if active == 'cameras' else '' }}">Cámaras</a>
+    <a href="/contacts" class="{{ 'active' if active == 'contacts' else '' }}">Contactos</a>
     <a href="{{ ha_url if ha_url is defined else 'http://homeassistant:8123' }}" target="_blank">Home Assistant ↗</a>
     <a href="{{ frigate_url if frigate_url is defined else 'http://frigate:5000' }}" target="_blank">Frigate ↗</a>
   </nav>

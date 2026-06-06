@@ -188,6 +188,7 @@ services:
       - "8080:8080"
     volumes:
       - ./config/frigate/frigate.yml:/config/frigate/frigate.yml
+      - action_data:/app/data
     networks:
       - asistente_net
     depends_on:

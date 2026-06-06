@@ -1,16 +1,13 @@
-import json
 import logging
+
+from ..contacts import get_contacts
 
 log = logging.getLogger("action-controller.family_call")
 
 
 async def execute(params: dict, context: dict) -> str:
     contact_name = params.get("contact_name", "").lower()
-
-    try:
-        contacts: list[dict] = json.loads(context.get("family_contacts", "[]"))
-    except (json.JSONDecodeError, TypeError):
-        contacts = []
+    contacts = get_contacts()
 
     contact = next(
         (c for c in contacts if contact_name in c.get("name", "").lower()),
@@ -18,7 +15,7 @@ async def execute(params: dict, context: dict) -> str:
     )
 
     if not contact:
-        return "No tengo ningún contacto familiar configurado. Pide ayuda a tu familiar para configurarlo."
+        return "No tengo ningún contacto familiar configurado. Puedes añadirlos en el panel de administración."
 
     phone = contact["phone"]
     name = contact["name"]
@@ -28,5 +25,4 @@ async def execute(params: dict, context: dict) -> str:
         return f"Llamando a {name}. Un momento por favor."
 
     log.info("Iniciando llamada a %s (%s)", name, phone)
-    # Integración con sistema de llamadas (SIP, GSM, etc.)
     return f"Llamando a {name}. Un momento por favor."
