@@ -33,8 +33,8 @@ class StatusCollector:
             client.subscribe("asistente/estado")
             client.subscribe("caidas/estado")
             client.subscribe("caidas/alerta")
-            client.subscribe("asistente/accion")
-            client.subscribe("asistente/transcripcion")
+            client.subscribe("asistente/respuesta")
+            client.subscribe("asistente/texto")
             log.info("MQTT conectado y suscrito.")
 
     def _on_message(self, client, userdata, msg) -> None:  # noqa: ANN001
@@ -57,15 +57,15 @@ class StatusCollector:
                         "timestamp": payload.get("timestamp", now),
                     })
 
-                elif msg.topic == "asistente/accion":
+                elif msg.topic == "asistente/respuesta":
                     alerts_store.append({
                         "type": "action",
-                        "action": payload.get("action", ""),
-                        "detail": payload.get("detail", ""),
-                        "timestamp": payload.get("timestamp", now),
+                        "action": payload.get("text", ""),
+                        "detail": "",
+                        "timestamp": now,
                     })
 
-                elif msg.topic == "asistente/transcripcion":
+                elif msg.topic == "asistente/texto":
                     alerts_store.append({
                         "type": "voice",
                         "text": payload.get("text", ""),

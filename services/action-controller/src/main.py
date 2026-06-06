@@ -36,13 +36,13 @@ async def main() -> None:
 
     dispatcher = ActionDispatcher(context=context, mqtt=mqtt)
 
+    loop = asyncio.get_running_loop()
+
     def on_intent(payload: dict) -> None:
-        asyncio.create_task(dispatcher.dispatch(payload))
+        asyncio.run_coroutine_threadsafe(dispatcher.dispatch(payload), loop)
 
     mqtt.subscribe("asistente/intent", on_intent)
     mqtt.publish_status("online")
-
-    loop = asyncio.get_running_loop()
     stop = loop.create_future()
     loop.add_signal_handler(signal.SIGTERM, stop.set_result, None)
     loop.add_signal_handler(signal.SIGINT, stop.set_result, None)

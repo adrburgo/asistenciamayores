@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "minor_version": 12,
+  "key": "core.device_registry",
+  "data": {
+    "devices": [
+      {"area_id":null,"config_entries":["01KTEPXNRJ5TS2HSFD36D6VYJ9"],"config_entries_subentries":{"01KTEPXNRJ5TS2HSFD36D6VYJ9":[null]},"configuration_url":"homeassistant://config/backup","connections":[],"created_at":"2026-06-06T14:55:47.498233+00:00","disabled_by":null,"entry_type":"service","hw_version":null,"id":"41c635f311f03e0f8a9e8862b1e40ac5","identifiers":[["backup","backup_manager"]],"labels":[],"manufacturer":"Home Assistant","model":"Home Assistant Backup","model_id":null,"modified_at":"2026-06-06T14:55:47.498278+00:00","name_by_user":null,"name":"Backup","primary_config_entry":"01KTEPXNRJ5TS2HSFD36D6VYJ9","serial_number":null,"sw_version":"2026.6.1","via_device_id":null},
+      {"area_id":null,"config_entries":["01KTEQ8CPWJ9CFKCJ9ETEJRSCM"],"config_entries_subentries":{"01KTEQ8CPWJ9CFKCJ9ETEJRSCM":[null]},"configuration_url":null,"connections":[],"created_at":"2026-06-06T15:01:38.713642+00:00","disabled_by":null,"entry_type":"service","hw_version":null,"id":"daf5bf11daec95f83bfdd9d9c915060c","identifiers":[["google_translate","01KTEQ8CPWJ9CFKCJ9ETEJRSCM"]],"labels":[],"manufacturer":"Google","model":"Google Translate TTS","model_id":null,"modified_at":"2026-06-06T15:01:38.713733+00:00","name_by_user":null,"name":"Google Translate en com","primary_config_entry":"01KTEQ8CPWJ9CFKCJ9ETEJRSCM","serial_number":null,"sw_version":null,"via_device_id":null}
+    ],
+    "deleted_devices": []
+  }
+}
