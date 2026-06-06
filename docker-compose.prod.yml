@@ -1,0 +1,76 @@
+services:
+
+  mosquitto:
+    restart: always
+
+  admin-ui:
+    restart: always
+    build:
+      target: production
+    environment:
+      - LOG_LEVEL=INFO
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  ollama:
+    restart: always
+
+  homeassistant:
+    restart: always
+
+  frigate:
+    restart: always
+
+  voice-service:
+    restart: always
+    build:
+      target: production
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL_PROD}
+      - LOG_LEVEL=INFO
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  ai-interpreter:
+    restart: always
+    build:
+      target: production
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL_PROD}
+      - LOG_LEVEL=INFO
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  action-controller:
+    restart: always
+    build:
+      target: production
+    environment:
+      - MOCK_ACTIONS=false
+      - LOG_LEVEL=INFO
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  vision-service:
+    restart: always
+    build:
+      target: production
+    environment:
+      - LOG_LEVEL=INFO
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"

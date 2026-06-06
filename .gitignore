@@ -1,0 +1,34 @@
+# Entorno y secretos
+.env
+config/homeassistant/secrets.yaml
+config/mosquitto/passwd
+
+# Entorno Python
+env/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Modelos (pesados, no commitear)
+services/*/models/
+*.pt
+*.onnx
+
+# Logs
+logs/
+*.log
+
+# Docker
+.docker/
+# Datos persistentes generados en runtime
+config/frigate/model_cache/
+services/action-controller/data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Claude Code (datos del asistente, no pertenecen al repo)
+.claude/

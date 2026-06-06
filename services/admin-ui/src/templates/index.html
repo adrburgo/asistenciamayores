@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Panel de estado</h1>
+
+{% if last_alert %}
+<div class="alert-danger">
+  ⚠️ <strong>Última alerta de caída</strong> —
+  Cámara: <strong>{{ last_alert.camera }}</strong> ·
+  {{ last_alert.timestamp | replace("T", " ") | truncate(19, True, "") }}
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Estado de servicios</h2>
+  <table>
+    <thead>
+      <tr><th>Servicio</th><th>Estado</th></tr>
+    </thead>
+    <tbody>
+      {% for service, status in services_status.items() %}
+      <tr>
+        <td>{{ service }}</td>
+        <td><span class="badge badge-{{ status }}">{{ status }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>Accesos rápidos</h2>
+  <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+    <a class="btn btn-primary" href="/cameras">Gestionar cámaras</a>
+    <a class="btn btn-secondary" href="{{ ha_url }}" target="_blank">Abrir Home Assistant ↗</a>
+    <a class="btn btn-secondary" href="{{ frigate_url }}" target="_blank">Abrir Frigate ↗</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Actualiza el estado cada 10 segundos sin recargar la página
+  setInterval(async () => {
+    const resp = await fetch("/api/status");
+    if (!resp.ok) return;
+    const data = await resp.json();
+    document.querySelectorAll("tbody tr").forEach(row => {
+      const name = row.cells[0]?.textContent?.trim();
+      if (name && data.services[name]) {
+        const badge = row.cells[1]?.querySelector(".badge");
+        if (badge) {
+          const s = data.services[name];
+          badge.className = `badge badge-${s}`;
+          badge.textContent = s;
+        }
+      }
+    });
+  }, 10000);
+</script>
+{% endblock %}

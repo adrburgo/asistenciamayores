@@ -1,0 +1,9 @@
+llamada_emergencia:
+  alias: "Llamada de emergencia"
+  description: "Publica intent de emergencia para que action-controller llame al 112"
+  sequence:
+    - service: mqtt.publish
+      data:
+        topic: asistente/intent
+        payload: '{"intent": "emergency_call", "params": {}, "confidence": 1.0, "source": "homeassistant"}'
+  mode: single

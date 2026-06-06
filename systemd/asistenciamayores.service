@@ -1,0 +1,40 @@
+[Unit]
+Description=Sistema de Asistencia para Mayores
+Documentation=file:///opt/asistenciamayores/CONTEXT_MAIN.md
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/asistenciamayores
+
+# Arranque en modo producción
+ExecStart=/usr/bin/docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.prod.yml \
+  up -d --remove-orphans
+
+# Parada limpia
+ExecStop=/usr/bin/docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.prod.yml \
+  down
+
+# Reinicio parcial (p.ej. tras actualización)
+ExecReload=/usr/bin/docker compose \
+  -f docker-compose.yml \
+  -f docker-compose.prod.yml \
+  up -d --remove-orphans
+
+Restart=on-failure
+RestartSec=30s
+TimeoutStartSec=300
+TimeoutStopSec=120
+
+# Esperar a que Docker esté realmente listo
+ExecStartPre=/bin/sh -c 'until docker info >/dev/null 2>&1; do sleep 1; done'
+
+[Install]
+WantedBy=multi-user.target

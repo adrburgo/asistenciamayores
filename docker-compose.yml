@@ -1,0 +1,217 @@
+services:
+
+  # ── Broker de mensajes MQTT ─────────────────────────────────────────────
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: mosquitto
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+    networks:
+      - asistente_net
+    healthcheck:
+      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "health", "-m", "ping", "-u", "${MQTT_USER}", "-P", "${MQTT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Servidor LLM local ──────────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - asistente_net
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # ── Home Assistant ──────────────────────────────────────────────────────
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./config/homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - asistente_net
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    privileged: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  # ── Frigate NVR + detección de personas ─────────────────────────────────
+  frigate:
+    image: ghcr.io/blakeblackshear/frigate:stable
+    container_name: frigate
+    ports:
+      - "5000:5000"
+      - "8971:8971"
+    volumes:
+      - ./config/frigate/frigate.yml:/config/config.yml
+      - frigate_media:/media/frigate
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - asistente_net
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    shm_size: "256mb"
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    environment:
+      - FRIGATE_RTSP_PASSWORD=${MQTT_PASSWORD}
+
+  # ── Servicio de voz (Whisper STT + Piper TTS) ───────────────────────────
+  voice-service:
+    build:
+      context: ./services/voice-service
+      dockerfile: Dockerfile
+    container_name: voice-service
+    volumes:
+      - whisper_models:/app/models/whisper
+      - piper_models:/app/models/piper
+    networks:
+      - asistente_net
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    devices:
+      - /dev/snd:/dev/snd
+    group_add:
+      - audio
+    environment:
+      - MQTT_HOST=${MQTT_HOST}
+      - MQTT_PORT=${MQTT_PORT}
+      - MQTT_USER=${MQTT_USER}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - WHISPER_LANGUAGE=${WHISPER_LANGUAGE}
+      - AUDIO_INPUT_DEVICE=${AUDIO_INPUT_DEVICE}
+      - AUDIO_OUTPUT_DEVICE=${AUDIO_OUTPUT_DEVICE}
+      - WAKE_WORD=${WAKE_WORD}
+      - PIPER_VOICE=${PIPER_VOICE}
+
+  # ── Intérprete de intents (Ollama LLM) ──────────────────────────────────
+  ai-interpreter:
+    build:
+      context: ./services/ai-interpreter
+      dockerfile: Dockerfile
+    container_name: ai-interpreter
+    networks:
+      - asistente_net
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      - MQTT_HOST=${MQTT_HOST}
+      - MQTT_PORT=${MQTT_PORT}
+      - MQTT_USER=${MQTT_USER}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - OLLAMA_HOST=${OLLAMA_HOST}
+      - OLLAMA_PORT=${OLLAMA_PORT}
+
+  # ── Controlador de acciones ──────────────────────────────────────────────
+  action-controller:
+    build:
+      context: ./services/action-controller
+      dockerfile: Dockerfile
+    container_name: action-controller
+    networks:
+      - asistente_net
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    volumes:
+      - action_data:/app/data
+    environment:
+      - MQTT_HOST=${MQTT_HOST}
+      - MQTT_PORT=${MQTT_PORT}
+      - MQTT_USER=${MQTT_USER}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - EMERGENCY_PHONE=${EMERGENCY_PHONE}
+      - FAMILY_CONTACTS=${FAMILY_CONTACTS}
+
+  # ── Servicio de visión (detección de caídas YOLOv8-Pose) ─────────────────
+  vision-service:
+    build:
+      context: ./services/vision-service
+      dockerfile: Dockerfile
+    container_name: vision-service
+    networks:
+      - asistente_net
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      frigate:
+        condition: service_started
+    volumes:
+      - yolo_models:/app/models
+    environment:
+      - MQTT_HOST=${MQTT_HOST}
+      - MQTT_PORT=${MQTT_PORT}
+      - MQTT_USER=${MQTT_USER}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - FRIGATE_HOST=${FRIGATE_HOST}
+      - FRIGATE_PORT=${FRIGATE_PORT}
+      - FALL_DETECTION_SECONDS=${FALL_DETECTION_SECONDS}
+      - FALL_DETECTION_CONFIDENCE=${FALL_DETECTION_CONFIDENCE}
+
+  # ── Panel de administración web ─────────────────────────────────────────
+  admin-ui:
+    build:
+      context: ./services/admin-ui
+      dockerfile: Dockerfile
+    container_name: admin-ui
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config/frigate/frigate.yml:/config/frigate/frigate.yml
+    networks:
+      - asistente_net
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    environment:
+      - MQTT_HOST=${MQTT_HOST}
+      - MQTT_PORT=${MQTT_PORT}
+      - MQTT_USER=${MQTT_USER}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+      - FRIGATE_HOST=${FRIGATE_HOST}
+      - FRIGATE_PORT=${FRIGATE_PORT}
+      - HA_URL=${HA_URL}
+
+networks:
+  asistente_net:
+    driver: bridge
+
+volumes:
+  mosquitto_data:
+  mosquitto_logs:
+  ollama_models:
+  frigate_media:
+  whisper_models:
+  piper_models:
+  yolo_models:
+  action_data:

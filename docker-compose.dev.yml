@@ -1,0 +1,50 @@
+services:
+
+  voice-service:
+    build:
+      target: development
+    volumes:
+      - ./services/voice-service/src:/app/src
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL_DEV}
+      - LOG_LEVEL=DEBUG
+      - MOCK_AUDIO=false
+
+  ai-interpreter:
+    build:
+      target: development
+    volumes:
+      - ./services/ai-interpreter/src:/app/src
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL_DEV}
+      - LOG_LEVEL=DEBUG
+
+  action-controller:
+    build:
+      target: development
+    volumes:
+      - ./services/action-controller/src:/app/src
+    environment:
+      - MOCK_ACTIONS=true
+      - LOG_LEVEL=DEBUG
+
+  vision-service:
+    build:
+      target: development
+    volumes:
+      - ./services/vision-service/src:/app/src
+    environment:
+      - LOG_LEVEL=DEBUG
+      - MOCK_FRIGATE=false
+
+  admin-ui:
+    build:
+      target: development
+    volumes:
+      - ./services/admin-ui/src:/app/src
+    environment:
+      - LOG_LEVEL=DEBUG
+
+  ollama:
+    environment:
+      - OLLAMA_DEBUG=1

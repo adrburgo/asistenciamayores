@@ -1,0 +1,78 @@
+homeassistant:
+  name: Asistencia Mayores
+  latitude: !secret latitude
+  longitude: !secret longitude
+  unit_system: metric
+  currency: EUR
+  country: ES
+  language: es
+  time_zone: Europe/Madrid
+
+# Interfaz web
+frontend:
+  themes: !include_dir_merge_named themes
+
+# HTTP
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 172.0.0.0/8
+
+# Logbook y historial
+logbook:
+history:
+
+# Integración MQTT (broker interno)
+mqtt:
+  broker: mosquitto
+  port: 1883
+  username: !secret mqtt_user
+  password: !secret mqtt_password
+  discovery: true
+  discovery_prefix: homeassistant
+
+# Sensores MQTT del sistema de asistencia
+sensor:
+  - platform: mqtt
+    name: "Asistente Estado"
+    state_topic: "asistente/estado"
+    value_template: "{{ value_json.status }}"
+    json_attributes_topic: "asistente/estado"
+
+  - platform: mqtt
+    name: "Última Transcripción"
+    state_topic: "asistente/texto"
+
+  - platform: mqtt
+    name: "Último Intent"
+    state_topic: "asistente/intent"
+    value_template: "{{ value_json.intent }}"
+    json_attributes_topic: "asistente/intent"
+
+  - platform: mqtt
+    name: "Vision Service Estado"
+    state_topic: "caidas/estado"
+    value_template: "{{ value_json.status }}"
+
+# Alerta de caída via MQTT
+binary_sensor:
+  - platform: mqtt
+    name: "Caída Detectada"
+    state_topic: "caidas/alerta"
+    value_template: "{{ 'ON' if value_json.alert else 'OFF' }}"
+    device_class: safety
+    off_delay: 30
+
+# Automatizaciones
+automation: !include automations.yaml
+
+# Scripts
+script: !include scripts.yaml
+
+# Notificaciones — configurar según dispositivos disponibles
+notify:
+  - platform: persistent_notification
+    name: sistema
+
+# Incluir paquetes adicionales
+# packages: !include_dir_named packages

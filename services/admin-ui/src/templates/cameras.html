@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Gestión de cámaras</h1>
+
+<div class="card">
+  <h2>Cámaras configuradas</h2>
+  {% if cameras %}
+  <table>
+    <thead>
+      <tr><th>Nombre</th><th>Tipo</th><th>Ruta / URL</th><th>Resolución</th><th>FPS</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for cam in cameras %}
+      <tr>
+        <td><strong>{{ cam.name }}</strong></td>
+        <td>
+          {% if cam.type == "usb" %}
+            <span class="badge badge-online">USB</span>
+          {% else %}
+            <span class="badge badge-processing">RTSP</span>
+          {% endif %}
+        </td>
+        <td style="font-family:monospace; font-size:0.82rem; word-break:break-all;">{{ cam.path }}</td>
+        <td>{{ cam.width }}×{{ cam.height }}</td>
+        <td>{{ cam.fps }}</td>
+        <td>
+          <form method="post" action="/cameras/{{ cam.name }}/delete"
+                onsubmit="return confirm('¿Eliminar la cámara {{ cam.name }}?')">
+            <button type="submit" class="btn btn-danger">Eliminar</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">📷</div>
+    No hay cámaras configuradas todavía.
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Añadir cámara</h2>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('rtsp', this)">Cámara IP (RTSP)</button>
+    <button class="tab-btn" onclick="showTab('usb', this)">Cámara USB</button>
+  </div>
+
+  <form method="post" action="/cameras/add" id="camera-form">
+    <div class="form-grid">
+
+      <div class="form-group form-full">
+        <label for="name">Nombre de la cámara</label>
+        <input type="text" id="name" name="name" required
+               placeholder="salon, dormitorio, entrada…"
+               pattern="[a-zA-Z0-9_\- ]+" title="Solo letras, números, guiones y espacios">
+        <small>Se normalizará a minúsculas sin espacios</small>
+      </div>
+
+      <!-- Panel RTSP -->
+      <div id="panel-rtsp" class="form-group form-full">
+        <label for="path-rtsp">URL RTSP de la cámara</label>
+        <input type="text" id="path-rtsp" placeholder="rtsp://usuario:contraseña@192.168.1.100:554/stream">
+        <small>Formato: rtsp://usuario:contraseña@IP:puerto/ruta</small>
+      </div>
+
+      <!-- Panel USB -->
+      <div id="panel-usb" class="form-group form-full" style="display:none">
+        <label for="path-usb">Dispositivo USB</label>
+        <select id="path-usb">
+          <option value="/dev/video0">/dev/video0 (predeterminado)</option>
+          <option value="/dev/video1">/dev/video1</option>
+          <option value="/dev/video2">/dev/video2</option>
+          <option value="/dev/video4">/dev/video4</option>
+        </select>
+        <small>Conecta la cámara antes de añadirla</small>
+      </div>
+
+      <!-- Campo hidden que recibe el valor real -->
+      <input type="hidden" id="path" name="path">
+
+      <div class="form-group">
+        <label for="width">Ancho (px)</label>
+        <input type="number" id="width" name="width" value="1280" min="320" max="3840" step="1">
+      </div>
+
+      <div class="form-group">
+        <label for="height">Alto (px)</label>
+        <input type="number" id="height" name="height" value="720" min="240" max="2160" step="1">
+      </div>
+
+      <div class="form-group">
+        <label for="fps">FPS</label>
+        <input type="number" id="fps" name="fps" value="5" min="1" max="30" step="1">
+        <small>5 FPS es suficiente para detección y ahorra recursos</small>
+      </div>
+
+      <div class="form-group" style="align-self:flex-end;">
+        <button type="submit" class="btn btn-primary" style="width:100%; padding:0.6rem;">
+          ➕ Añadir cámara
+        </button>
+      </div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let currentTab = 'rtsp';
+
+  function showTab(tab, btn) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('panel-rtsp').style.display = tab === 'rtsp' ? '' : 'none';
+    document.getElementById('panel-usb').style.display  = tab === 'usb'  ? '' : 'none';
+  }
+
+  document.getElementById('camera-form').addEventListener('submit', function(e) {
+    const pathField = document.getElementById('path');
+    if (currentTab === 'rtsp') {
+      pathField.value = document.getElementById('path-rtsp').value.trim();
+    } else {
+      pathField.value = document.getElementById('path-usb').value;
+    }
+    if (!pathField.value) {
+      e.preventDefault();
+      alert('Por favor introduce la URL o selecciona el dispositivo.');
+    }
+  });
+</script>
+{% endblock %}

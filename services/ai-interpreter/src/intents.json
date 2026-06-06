@@ -1,0 +1,49 @@
+{
+  "emergency_call": {
+    "description": "El usuario pide ayuda de emergencia, se siente mal, hay peligro o necesita asistencia médica urgente.",
+    "examples": [
+      "Ayuda", "Llama al médico", "Emergencia", "Me encuentro mal",
+      "Necesito ayuda", "Llama a urgencias", "Me he caído", "Tengo dolor en el pecho"
+    ],
+    "params": []
+  },
+  "medication_reminder": {
+    "description": "El usuario pregunta por su medicación, quiere saber qué pastillas tomar o pide que le recuerden.",
+    "examples": [
+      "¿Qué pastillas tomo hoy?", "Recuérdame la medicación",
+      "¿He tomado mis pastillas?", "¿Cuándo es mi próxima dosis?",
+      "Necesito tomar el medicamento", "¿Qué pastillas son las de la mañana?"
+    ],
+    "params": ["time_of_day"]
+  },
+  "home_control": {
+    "description": "El usuario quiere controlar dispositivos del hogar: luces, televisión, persianas, temperatura.",
+    "examples": [
+      "Enciende la luz", "Apaga la televisión", "Sube las persianas",
+      "Pon más calefacción", "Apaga todo", "Baja la persiana del salón",
+      "Enciende el ventilador", "Pon la tele"
+    ],
+    "params": ["device", "action", "location"]
+  },
+  "family_call": {
+    "description": "El usuario quiere llamar o hablar con un familiar.",
+    "examples": [
+      "Llama a mi hijo", "Quiero hablar con María", "Llama a casa",
+      "Pon a mi hija", "Quiero ver a los niños", "Llama a Juan"
+    ],
+    "params": ["contact_name"]
+  },
+  "status_check": {
+    "description": "El usuario pregunta por el estado del sistema, la hora, el tiempo o información general.",
+    "examples": [
+      "¿Todo bien?", "¿Qué hora es?", "¿Cómo estoy?",
+      "¿Funciona todo?", "¿Qué tiempo hace?", "¿Qué día es hoy?"
+    ],
+    "params": ["query_type"]
+  },
+  "unknown": {
+    "description": "La intención no está clara o no coincide con ninguna de las categorías anteriores.",
+    "examples": [],
+    "params": []
+  }
+}

@@ -1,0 +1,8 @@
+faster-whisper==1.1.1
+silero-vad==5.1.2
+piper-tts==1.2.0
+sounddevice==0.5.1
+numpy==2.2.6
+paho-mqtt==2.1.0
+openwakeword==0.6.0
+onnxruntime==1.21.1

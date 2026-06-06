@@ -1,0 +1,69 @@
+- id: alerta_caida
+  alias: "Alerta: Caída detectada"
+  description: "Notifica y ejecuta acciones cuando se detecta una caída"
+  trigger:
+    - platform: mqtt
+      topic: caidas/alerta
+  condition:
+    - condition: template
+      value_template: "{{ trigger.payload_json.confidence >= 0.6 }}"
+  action:
+    - service: notify.sistema
+      data:
+        title: "⚠️ POSIBLE CAÍDA DETECTADA"
+        message: >
+          Cámara: {{ trigger.payload_json.camera }}
+          Confianza: {{ (trigger.payload_json.confidence * 100) | round }}%
+          Hora: {{ now().strftime('%H:%M:%S') }}
+    - service: mqtt.publish
+      data:
+        topic: asistente/respuesta
+        payload: '{"text": "He detectado una posible caída. ¿Estás bien? Responde si necesitas ayuda."}'
+  mode: single
+  max_exceeded: silent
+
+- id: recordatorio_medicacion
+  alias: "Recordatorio de medicación"
+  description: "Recuerda al mayor tomar la medicación"
+  trigger:
+    - platform: time
+      at: input_datetime.medicacion_manana
+    - platform: time
+      at: input_datetime.medicacion_tarde
+    - platform: time
+      at: input_datetime.medicacion_noche
+  action:
+    - service: mqtt.publish
+      data:
+        topic: asistente/respuesta
+        payload: '{"text": "Es la hora de tomar la medicación."}'
+  mode: single
+
+- id: control_hogar_mqtt
+  alias: "Asistente: control del hogar por MQTT"
+  description: "Recibe órdenes de home_control del asistente y las ejecuta en HA"
+  trigger:
+    - platform: mqtt
+      topic: asistente/home_control
+  action:
+    - service: "homeassistant.{{ trigger.payload_json.action }}"
+      target:
+        entity_id: "{{ trigger.payload_json.entity_id }}"
+  mode: queued
+  max: 5
+
+- id: estado_servicios
+  alias: "Monitoreo: servicios desconectados"
+  description: "Alerta si un servicio lleva más de 5 minutos sin reportar"
+  trigger:
+    - platform: state
+      entity_id: sensor.asistente_estado
+      to: "offline"
+      for:
+        minutes: 5
+  action:
+    - service: notify.sistema
+      data:
+        title: "⚠️ Servicio desconectado"
+        message: "El servicio del asistente lleva más de 5 minutos sin responder."
+  mode: single
