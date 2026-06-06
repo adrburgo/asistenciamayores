@@ -3,58 +3,128 @@
 <h1>Panel de estado</h1>
 
 {% if last_alert %}
-<div class="alert-danger">
-  ⚠️ <strong>Última alerta de caída</strong> —
-  Cámara: <strong>{{ last_alert.camera }}</strong> ·
-  {{ last_alert.timestamp | replace("T", " ") | truncate(19, True, "") }}
+<div class="alert-banner alert-danger">
+  <span style="font-size:1.2rem;">🚨</span>
+  <div>
+    <strong>Última caída detectada</strong> —
+    Cámara: <strong>{{ last_alert.camera }}</strong> ·
+    {{ last_alert.timestamp | replace("T", " ") | truncate(19, True, "") }}
+    <span style="margin-left:0.5rem;">
+      <a href="/alerts" style="color:inherit; font-weight:700;">Ver historial →</a>
+    </span>
+  </div>
 </div>
 {% endif %}
 
-<div class="card">
-  <h2>Estado de servicios</h2>
-  <table>
-    <thead>
-      <tr><th>Servicio</th><th>Estado</th></tr>
-    </thead>
-    <tbody>
-      {% for service, status in services_status.items() %}
-      <tr>
-        <td>{{ service }}</td>
-        <td><span class="badge badge-{{ status }}">{{ status }}</span></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card {{ 'stat-danger' if falls_today > 0 else '' }}">
+    <span class="stat-label">Caídas hoy</span>
+    <span class="stat-value" id="stat-falls">{{ falls_today }}</span>
+    <span class="stat-sub">detectadas hoy</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">Comandos de voz</span>
+    <span class="stat-value" id="stat-voice">{{ voice_today }}</span>
+    <span class="stat-sub">procesados hoy</span>
+  </div>
+  <div class="stat-card {{ 'stat-ok' if cameras_count > 0 else '' }}">
+    <span class="stat-label">Cámaras</span>
+    <span class="stat-value">{{ cameras_count }}</span>
+    <span class="stat-sub">configuradas</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">Servicios activos</span>
+    <span class="stat-value" id="stat-online">{{ online_count }}</span>
+    <span class="stat-sub">de {{ services_status | length }}</span>
+  </div>
 </div>
 
+<!-- Servicios -->
 <div class="card">
-  <h2>Accesos rápidos</h2>
-  <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+  <h2>Estado de servicios</h2>
+  <div class="services-grid" id="services-grid">
+    {% for service, status in services_status.items() %}
+    <div class="service-card">
+      <span class="service-name">{{ service }}</span>
+      <span class="badge badge-{{ status }}" data-service="{{ service }}">{{ status }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Últimos eventos -->
+<div class="card">
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1rem;">
+    <h2 style="margin:0;">Últimos eventos</h2>
+    <a href="/alerts" class="btn btn-secondary" style="font-size:0.8rem; padding:0.3rem 0.75rem;">Ver todos</a>
+  </div>
+
+  {% if recent_events %}
+  <div class="event-list">
+    {% for ev in recent_events %}
+    <div class="event-item">
+      {% if ev.type == 'fall' %}
+        <div class="event-icon fall">🚨</div>
+        <div class="event-body">
+          <div class="event-title">Caída detectada</div>
+          <div class="event-detail">Cámara: {{ ev.camera }} · Confianza: {{ "%.0f"|format(ev.confidence * 100) }}%</div>
+        </div>
+      {% elif ev.type == 'voice' %}
+        <div class="event-icon voice">🎙️</div>
+        <div class="event-body">
+          <div class="event-title">Comando de voz</div>
+          <div class="event-detail">{{ ev.text }}</div>
+        </div>
+      {% elif ev.type == 'action' %}
+        <div class="event-icon action">✅</div>
+        <div class="event-body">
+          <div class="event-title">{{ ev.action }}</div>
+          <div class="event-detail">{{ ev.detail }}</div>
+        </div>
+      {% endif %}
+      <span class="event-time">{{ ev.timestamp | replace("T", " ") | truncate(16, True, "") }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state" style="padding:1.5rem;">
+    <div class="icon">📋</div>
+    Sin eventos registrados todavía.
+  </div>
+  {% endif %}
+</div>
+
+<!-- Acciones rápidas -->
+<div class="card">
+  <h2>Acciones rápidas</h2>
+  <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
     <a class="btn btn-primary" href="/cameras">Gestionar cámaras</a>
-    <a class="btn btn-secondary" href="{{ ha_url }}" target="_blank">Abrir Home Assistant ↗</a>
-    <a class="btn btn-secondary" href="{{ frigate_url }}" target="_blank">Abrir Frigate ↗</a>
+    <a class="btn btn-secondary" href="/contacts">Contactos de emergencia</a>
+    <a class="btn btn-secondary" href="/settings">Configuración</a>
+    <a class="btn btn-secondary" href="/alerts">Historial de alertas</a>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-  // Actualiza el estado cada 10 segundos sin recargar la página
   setInterval(async () => {
-    const resp = await fetch("/api/status");
-    if (!resp.ok) return;
-    const data = await resp.json();
-    document.querySelectorAll("tbody tr").forEach(row => {
-      const name = row.cells[0]?.textContent?.trim();
-      if (name && data.services[name]) {
-        const badge = row.cells[1]?.querySelector(".badge");
-        if (badge) {
-          const s = data.services[name];
-          badge.className = `badge badge-${s}`;
-          badge.textContent = s;
-        }
-      }
-    });
+    try {
+      const resp = await fetch("/api/status");
+      if (!resp.ok) return;
+      const data = await resp.json();
+
+      document.querySelectorAll("[data-service]").forEach(badge => {
+        const s = data.services[badge.dataset.service];
+        if (s) { badge.className = `badge badge-${s}`; badge.textContent = s; }
+      });
+
+      const el = document.getElementById("stat-falls");
+      if (el) el.textContent = data.falls_today ?? el.textContent;
+      const ev = document.getElementById("stat-voice");
+      if (ev) ev.textContent = data.voice_today ?? ev.textContent;
+    } catch (_) {}
   }, 10000);
 </script>
 {% endblock %}

@@ -1,42 +1,31 @@
 mqtt:
   host: mosquitto
   port: 1883
-  user: "{FRIGATE_RTSP_PASSWORD}"
+  user: asistente
   password: "{FRIGATE_RTSP_PASSWORD}"
   topic_prefix: frigate
 
-# Detector de objetos (CPU por defecto, añadir Coral/GPU si disponible)
 detectors:
   cpu1:
     type: cpu
     num_threads: 3
 
-# Modelo de detección
-model:
-  path: /config/model_cache/yolov8n.onnx
-  input_tensor: nhwc
-  input_pixel_format: rgb
-  width: 320
-  height: 320
-  labelmap_path: /config/model_cache/coco-80.txt
-
-# Grabación
 record:
   enabled: true
-  retain:
-    days: 3
-    mode: motion
-  events:
+  alerts:
     retain:
-      default: 10
+      days: 10
+  detections:
+    retain:
+      days: 10
+  motion:
+    days: 3
 
-# Instantáneas al detectar
 snapshots:
   enabled: true
   retain:
     default: 10
 
-# Objetos a detectar
 objects:
   track:
     - person
@@ -45,33 +34,18 @@ objects:
       min_score: 0.5
       threshold: 0.7
 
-# Definición de cámaras — EDITAR con las cámaras reales
 cameras:
-  # Ejemplo cámara USB (descomentar y ajustar)
-  # salon:
-  #   ffmpeg:
-  #     inputs:
-  #       - path: /dev/video0
-  #         roles:
-  #           - detect
-  #           - record
-  #   detect:
-  #     width: 1280
-  #     height: 720
-  #     fps: 5
-  #   zones:
-  #     zona_principal:
-  #       coordinates: 0,0,1280,0,1280,720,0,720
+  webcam:
+    ffmpeg:
+      input_args: -f v4l2 -input_format mjpeg -video_size 1280x720 -framerate 5
+      inputs:
+        - path: /dev/video0
+          roles:
+            - detect
+            - record
+    detect:
+      width: 1280
+      height: 720
+      fps: 5
 
-  # Ejemplo cámara IP RTSP (descomentar y ajustar)
-  # dormitorio:
-  #   ffmpeg:
-  #     inputs:
-  #       - path: rtsp://usuario:contraseña@192.168.1.100:554/stream
-  #         roles:
-  #           - detect
-  #           - record
-  #   detect:
-  #     width: 1920
-  #     height: 1080
-  #     fps: 5
+version: 0.17-0

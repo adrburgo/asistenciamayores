@@ -9,12 +9,16 @@ services:
       - "9001:9001"
     volumes:
       - ./config/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./config/mosquitto/passwd:/mosquitto/config/passwd:ro
       - mosquitto_data:/mosquitto/data
       - mosquitto_logs:/mosquitto/log
     networks:
       - asistente_net
+    environment:
+      - MQTT_USER=${MQTT_USER}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
     healthcheck:
-      test: ["CMD", "mosquitto_pub", "-h", "localhost", "-t", "health", "-m", "ping", "-u", "${MQTT_USER}", "-P", "${MQTT_PASSWORD}"]
+      test: ["CMD-SHELL", "mosquitto_pub -h localhost -t health -m ping -u $${MQTT_USER} -P $${MQTT_PASSWORD}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -32,33 +36,11 @@ services:
     environment:
       - OLLAMA_KEEP_ALIVE=24h
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      test: ["CMD", "ollama", "list"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 60s
-
-  # ── Home Assistant ──────────────────────────────────────────────────────
-  homeassistant:
-    image: ghcr.io/home-assistant/home-assistant:stable
-    container_name: homeassistant
-    ports:
-      - "8123:8123"
-    volumes:
-      - ./config/homeassistant:/config
-      - /etc/localtime:/etc/localtime:ro
-    networks:
-      - asistente_net
-    depends_on:
-      mosquitto:
-        condition: service_healthy
-    privileged: true
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8123"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 90s
 
   # ── Frigate NVR + detección de personas ─────────────────────────────────
   frigate:
@@ -79,6 +61,7 @@ services:
     shm_size: "256mb"
     devices:
       - /dev/bus/usb:/dev/bus/usb
+      - /dev/video0:/dev/video0
     environment:
       - FRIGATE_RTSP_PASSWORD=${MQTT_PASSWORD}
 
@@ -189,6 +172,9 @@ services:
     volumes:
       - ./config/frigate/frigate.yml:/config/frigate/frigate.yml
       - action_data:/app/data
+      - /sys/class/video4linux:/sys/class/video4linux:ro
+    devices:
+      - /dev/video0:/dev/video0
     networks:
       - asistente_net
     depends_on:
@@ -201,7 +187,6 @@ services:
       - MQTT_PASSWORD=${MQTT_PASSWORD}
       - FRIGATE_HOST=${FRIGATE_HOST}
       - FRIGATE_PORT=${FRIGATE_PORT}
-      - HA_URL=${HA_URL}
 
 networks:
   asistente_net:

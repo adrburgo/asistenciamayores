@@ -1,8 +1,11 @@
 import json
 import logging
 import threading
+from datetime import datetime, timezone
 
 import paho.mqtt.client as mqtt
+
+from . import alerts_store
 
 log = logging.getLogger("admin-ui.mqtt")
 
@@ -30,20 +33,57 @@ class StatusCollector:
             client.subscribe("asistente/estado")
             client.subscribe("caidas/estado")
             client.subscribe("caidas/alerta")
+            client.subscribe("asistente/accion")
+            client.subscribe("asistente/transcripcion")
+            log.info("MQTT conectado y suscrito.")
 
     def _on_message(self, client, userdata, msg) -> None:  # noqa: ANN001
         try:
             payload = json.loads(msg.payload.decode())
+            now = datetime.now(timezone.utc).isoformat()
             with self._lock:
                 if msg.topic in ("asistente/estado", "caidas/estado"):
                     service = payload.get("service", "")
                     status = payload.get("status", "unknown")
                     if service:
                         self._status[service] = status
+
                 elif msg.topic == "caidas/alerta":
                     self._last_alert = payload
+                    alerts_store.append({
+                        "type": "fall",
+                        "camera": payload.get("camera", "desconocida"),
+                        "confidence": payload.get("confidence", 0),
+                        "timestamp": payload.get("timestamp", now),
+                    })
+
+                elif msg.topic == "asistente/accion":
+                    alerts_store.append({
+                        "type": "action",
+                        "action": payload.get("action", ""),
+                        "detail": payload.get("detail", ""),
+                        "timestamp": payload.get("timestamp", now),
+                    })
+
+                elif msg.topic == "asistente/transcripcion":
+                    alerts_store.append({
+                        "type": "voice",
+                        "text": payload.get("text", ""),
+                        "timestamp": payload.get("timestamp", now),
+                    })
+
         except Exception as e:
             log.debug("Error procesando MQTT: %s", e)
+
+    def publish_config(self, config: dict) -> None:
+        try:
+            self._client.publish(
+                "config/asistente",
+                json.dumps(config, ensure_ascii=False),
+                retain=True,
+            )
+        except Exception as e:
+            log.warning("Error publicando config: %s", e)
 
     def get_status(self) -> dict:
         with self._lock:

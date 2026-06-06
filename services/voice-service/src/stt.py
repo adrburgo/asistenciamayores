@@ -11,9 +11,10 @@ from faster_whisper import WhisperModel
 log = logging.getLogger("voice-service.stt")
 
 SAMPLE_RATE = 16000
-BLOCK_SIZE = 1600  # 100ms a 16kHz
-VAD_THRESHOLD = 0.5
-SILENCE_TIMEOUT = 1.5  # segundos de silencio para considerar fin de frase
+BLOCK_SIZE = 1600          # 100 ms a 16 kHz
+AMPLITUDE_THRESHOLD = 0.02 # RMS mínimo para considerar que hay voz
+SILENCE_TIMEOUT = 1.5      # segundos de silencio para cerrar la frase
+MAX_PHRASE_SECONDS = 15    # corta si la frase es demasiado larga
 
 
 class STTEngine:
@@ -32,19 +33,7 @@ class STTEngine:
         self._model = WhisperModel(model, device="cpu", download_root=str(model_dir))
         log.info("Modelo Whisper listo.")
 
-        device_index = None if input_device == "default" else int(input_device)
-        self._device_index = device_index
-
-        self._vad_model, self._vad_utils = self._load_vad()
-
-    def _load_vad(self):  # noqa: ANN201
-        import torch
-        model, utils = torch.hub.load(
-            repo_or_dir="snakers4/silero-vad",
-            model="silero_vad",
-            force_reload=False,
-        )
-        return model, utils
+        self._device_index = None if input_device == "default" else int(input_device)
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._listen_loop, daemon=True)
@@ -66,7 +55,7 @@ class STTEngine:
         audio_buffer: list[np.ndarray] = []
         is_speaking = False
         silence_start: float | None = None
-        (get_speech_ts, _, _, _, _) = self._vad_utils
+        phrase_start: float | None = None
 
         with sd.InputStream(
             samplerate=SAMPLE_RATE,
@@ -81,34 +70,38 @@ class STTEngine:
                     continue
 
                 block, _ = stream.read(BLOCK_SIZE)
-                audio_chunk = block.flatten()
+                chunk = block.flatten()
+                rms = float(np.sqrt(np.mean(chunk ** 2)))
 
-                import torch
-                chunk_tensor = torch.from_numpy(audio_chunk)
-                speech_prob = self._vad_model(chunk_tensor, SAMPLE_RATE).item()
-
-                if speech_prob > VAD_THRESHOLD:
+                if rms > AMPLITUDE_THRESHOLD:
                     if not is_speaking:
-                        log.debug("Inicio de voz detectado.")
+                        log.debug("Voz detectada (RMS=%.4f).", rms)
                         is_speaking = True
-                    audio_buffer.append(audio_chunk)
+                        phrase_start = time.monotonic()
+                    audio_buffer.append(chunk)
                     silence_start = None
                 elif is_speaking:
-                    audio_buffer.append(audio_chunk)
+                    audio_buffer.append(chunk)
                     if silence_start is None:
                         silence_start = time.monotonic()
-                    elif time.monotonic() - silence_start > SILENCE_TIMEOUT:
+
+                    elapsed_silence = time.monotonic() - silence_start
+                    elapsed_phrase = time.monotonic() - (phrase_start or 0)
+
+                    if elapsed_silence >= SILENCE_TIMEOUT or elapsed_phrase >= MAX_PHRASE_SECONDS:
                         self._process_audio(np.concatenate(audio_buffer))
                         audio_buffer = []
                         is_speaking = False
                         silence_start = None
+                        phrase_start = None
 
     def _process_audio(self, audio: np.ndarray) -> None:
         segments, info = self._model.transcribe(
             audio,
             language=self._language,
             beam_size=3,
-            vad_filter=True,
+            vad_filter=True,     # VAD integrado de faster-whisper (silero interno)
+            vad_parameters={"min_silence_duration_ms": 500},
         )
         text = " ".join(s.text for s in segments).strip()
         if not text:

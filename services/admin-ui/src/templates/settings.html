@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Configuración</h1>
+
+{% if saved %}
+<div class="alert-banner alert-success">
+  ✓ <strong>Configuración guardada.</strong>
+  Los cambios se han aplicado y publicado via MQTT.
+</div>
+{% endif %}
+
+<form method="post" action="/settings">
+  <!-- Detección de caídas -->
+  <div class="card">
+    <h2>Detección de caídas</h2>
+    <p style="font-size:0.84rem; color:#718096; margin-bottom:1.2rem;">
+      Ajusta cuándo y con qué sensibilidad se activa la alerta de caída.
+    </p>
+    <div class="form-grid">
+
+      <div class="form-group">
+        <label for="fall_detection_seconds">
+          Segundos hasta lanzar alerta
+        </label>
+        <input type="number" id="fall_detection_seconds" name="fall_detection_seconds"
+               value="{{ cfg.fall_detection_seconds }}"
+               min="1" max="60" required>
+        <small>La persona debe estar caída este tiempo antes de activar la alerta (recomendado: 5 s)</small>
+      </div>
+
+      <div class="form-group">
+        <label for="fall_detection_confidence">
+          Confianza mínima
+          <span id="conf-label" style="font-weight:400; color:#2b4a8b; margin-left:0.3rem;">
+            ({{ "%.0f"|format(cfg.fall_detection_confidence * 100) }}%)
+          </span>
+        </label>
+        <input type="range" id="fall_detection_confidence" name="fall_detection_confidence"
+               value="{{ cfg.fall_detection_confidence }}"
+               min="0.1" max="1.0" step="0.05"
+               style="width:100%; accent-color:#2b4a8b;"
+               oninput="document.getElementById('conf-label').textContent = '(' + Math.round(this.value*100) + '%)'">
+        <small>Umbral de YOLOv8 para considerar una caída real (recomendado: 0.60)</small>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Voz -->
+  <div class="card">
+    <h2>Reconocimiento de voz</h2>
+    <p style="font-size:0.84rem; color:#718096; margin-bottom:1.2rem;">
+      Configura el idioma del reconocimiento y la palabra de activación.
+    </p>
+    <div class="form-grid">
+
+      <div class="form-group">
+        <label for="whisper_language">Idioma</label>
+        <select id="whisper_language" name="whisper_language">
+          {% for code, name in languages %}
+          <option value="{{ code }}" {{ 'selected' if cfg.whisper_language == code else '' }}>
+            {{ name }}
+          </option>
+          {% endfor %}
+        </select>
+        <small>Idioma en el que hablará el usuario al asistente</small>
+      </div>
+
+      <div class="form-group">
+        <label for="wake_word">Palabra de activación</label>
+        <input type="text" id="wake_word" name="wake_word"
+               value="{{ cfg.wake_word }}"
+               placeholder="Vacío = siempre escuchando">
+        <small>Si se deja vacío, el asistente escucha constantemente. Ejemplo: "Hola asistente"</small>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="display:flex; justify-content:flex-end; gap:0.75rem;">
+    <a href="/" class="btn btn-secondary">Cancelar</a>
+    <button type="submit" class="btn btn-primary" style="padding:0.5rem 2rem;">
+      Guardar cambios
+    </button>
+  </div>
+</form>
+{% endblock %}

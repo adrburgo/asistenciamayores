@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.75rem;">
+  <h1 style="margin:0;">Historial de alertas</h1>
+  {% if events %}
+  <form method="post" action="/alerts/clear"
+        onsubmit="return confirm('¿Borrar todo el historial?')">
+    <button type="submit" class="btn btn-danger" style="font-size:0.82rem;">
+      Borrar historial
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+<!-- Stats del día -->
+<div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); margin-bottom:1.5rem;">
+  <div class="stat-card {{ 'stat-danger' if falls_today > 0 else '' }}">
+    <span class="stat-label">Caídas hoy</span>
+    <span class="stat-value">{{ falls_today }}</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">Comandos de voz hoy</span>
+    <span class="stat-value">{{ voice_today }}</span>
+  </div>
+  <div class="stat-card">
+    <span class="stat-label">Total registros</span>
+    <span class="stat-value">{{ events | length }}</span>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="card" style="padding:1rem 1.5rem;">
+  <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+    <span style="font-size:0.82rem; font-weight:600; color:#4a5568; margin-right:0.25rem;">Filtrar:</span>
+    <button class="filter-btn btn btn-secondary active" data-type="all"
+            style="font-size:0.8rem; padding:0.25rem 0.8rem;">Todos</button>
+    <button class="filter-btn btn btn-secondary" data-type="fall"
+            style="font-size:0.8rem; padding:0.25rem 0.8rem;">🚨 Caídas</button>
+    <button class="filter-btn btn btn-secondary" data-type="voice"
+            style="font-size:0.8rem; padding:0.25rem 0.8rem;">🎙️ Voz</button>
+    <button class="filter-btn btn btn-secondary" data-type="action"
+            style="font-size:0.8rem; padding:0.25rem 0.8rem;">✅ Acciones</button>
+  </div>
+</div>
+
+<!-- Lista de eventos -->
+<div class="card">
+  {% if events %}
+  <div class="event-list" id="event-list">
+    {% for ev in events %}
+    <div class="event-item" data-type="{{ ev.type }}">
+      {% if ev.type == 'fall' %}
+        <div class="event-icon fall">🚨</div>
+        <div class="event-body">
+          <div class="event-title">Caída detectada</div>
+          <div class="event-detail">
+            Cámara: <strong>{{ ev.camera }}</strong> ·
+            Confianza: <strong>{{ "%.0f"|format(ev.confidence * 100) }}%</strong>
+          </div>
+        </div>
+      {% elif ev.type == 'voice' %}
+        <div class="event-icon voice">🎙️</div>
+        <div class="event-body">
+          <div class="event-title">Comando de voz</div>
+          <div class="event-detail">"{{ ev.text }}"</div>
+        </div>
+      {% elif ev.type == 'action' %}
+        <div class="event-icon action">✅</div>
+        <div class="event-body">
+          <div class="event-title">{{ ev.action }}</div>
+          {% if ev.detail %}<div class="event-detail">{{ ev.detail }}</div>{% endif %}
+        </div>
+      {% else %}
+        <div class="event-icon" style="background:#f0f4f8;">📌</div>
+        <div class="event-body">
+          <div class="event-title">Evento</div>
+          <div class="event-detail">{{ ev | string }}</div>
+        </div>
+      {% endif %}
+      <span class="event-time">
+        {{ ev.timestamp | replace("T", " ") | truncate(19, True, "") }}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">📋</div>
+    Sin eventos registrados todavía.<br>
+    <small>Los eventos aparecerán aquí cuando el sistema detecte caídas o procese comandos de voz.</small>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach(b => b.classList.remove('active', 'btn-primary'));
+      filterBtns.forEach(b => b.classList.add('btn-secondary'));
+      btn.classList.add('active', 'btn-primary');
+      btn.classList.remove('btn-secondary');
+
+      const type = btn.dataset.type;
+      document.querySelectorAll('.event-item').forEach(item => {
+        item.style.display = (type === 'all' || item.dataset.type === type) ? '' : 'none';
+      });
+    });
+  });
+
+  // Refresco automático de nuevos eventos
+  let knownCount = {{ events | length }};
+  setInterval(async () => {
+    try {
+      const resp = await fetch("/api/alerts");
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data.events.length > knownCount) {
+        knownCount = data.events.length;
+        location.reload();
+      }
+    } catch (_) {}
+  }, 15000);
+</script>
+{% endblock %}

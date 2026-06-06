@@ -35,14 +35,15 @@ echo "=== Configurando MQTT ==="
 if [ ! -f config/mosquitto/passwd ]; then
   if command -v mosquitto_passwd &>/dev/null; then
     mosquitto_passwd -c -b config/mosquitto/passwd "$MQTT_USER" "$MQTT_PASSWORD"
-    echo "[OK] Fichero de contraseñas MQTT creado."
   else
     echo "[!] mosquitto_passwd no encontrado. Creando passwd vía Docker..."
     docker run --rm -v "$ROOT_DIR/config/mosquitto:/mosquitto/config" \
       eclipse-mosquitto:2 \
       mosquitto_passwd -c -b /mosquitto/config/passwd "$MQTT_USER" "$MQTT_PASSWORD"
-    echo "[OK] Fichero de contraseñas MQTT creado vía Docker."
   fi
+  # El fichero puede quedar como root si se creó vía Docker; mosquitto necesita leerlo
+  chmod 644 config/mosquitto/passwd
+  echo "[OK] Fichero de contraseñas MQTT creado."
 else
   echo "[OK] Fichero passwd MQTT ya existe."
 fi

@@ -2,37 +2,76 @@
 {% block content %}
 <h1>Gestión de cámaras</h1>
 
+<!-- Modal de stream en directo -->
+<div id="stream-modal" style="
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.82);
+  z-index:1000; align-items:center; justify-content:center; flex-direction:column; gap:1rem;">
+  <div style="position:relative; max-width:90vw;">
+    <img id="stream-img" src="" alt="Stream"
+         style="max-width:90vw; max-height:80vh; border-radius:8px; display:block;">
+    <div id="stream-error" style="display:none; color:#fc8181; text-align:center; padding:2rem;">
+      No se puede conectar a Frigate.<br>
+      <small style="color:#a0aec0;">Verifica que Frigate esté activo y la cámara configurada.</small>
+    </div>
+  </div>
+  <div style="display:flex; gap:0.75rem; align-items:center;">
+    <span id="stream-label" style="color:white; font-size:0.9rem; font-weight:600;"></span>
+    <button onclick="closeModal()" class="btn btn-secondary">Cerrar</button>
+  </div>
+</div>
+
+<!-- Cámaras configuradas -->
 <div class="card">
   <h2>Cámaras configuradas</h2>
   {% if cameras %}
-  <table>
-    <thead>
-      <tr><th>Nombre</th><th>Tipo</th><th>Ruta / URL</th><th>Resolución</th><th>FPS</th><th></th></tr>
-    </thead>
-    <tbody>
-      {% for cam in cameras %}
-      <tr>
-        <td><strong>{{ cam.name }}</strong></td>
-        <td>
-          {% if cam.type == "usb" %}
-            <span class="badge badge-online">USB</span>
-          {% else %}
-            <span class="badge badge-processing">RTSP</span>
-          {% endif %}
-        </td>
-        <td style="font-family:monospace; font-size:0.82rem; word-break:break-all;">{{ cam.path }}</td>
-        <td>{{ cam.width }}×{{ cam.height }}</td>
-        <td>{{ cam.fps }}</td>
-        <td>
+  <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap:1rem;">
+    {% for cam in cameras %}
+    <div style="border:1.5px solid #e2e8f0; border-radius:10px; overflow:hidden;">
+      <!-- Thumbnail -->
+      <div style="background:#1a202c; aspect-ratio:16/9; position:relative; cursor:pointer;"
+           onclick="openStream('{{ cam.name }}')">
+        <img id="thumb-{{ cam.name }}"
+             src="/cameras/{{ cam.name }}/snapshot"
+             alt="{{ cam.name }}"
+             style="width:100%; height:100%; object-fit:cover;"
+             onerror="this.style.display='none'; document.getElementById('thumb-err-{{ cam.name }}').style.display='flex'">
+        <div id="thumb-err-{{ cam.name }}"
+             style="display:none; position:absolute; inset:0; align-items:center; justify-content:center;
+                    flex-direction:column; gap:0.5rem; color:#718096; font-size:0.8rem; text-align:center; padding:1rem;">
+          <span style="font-size:1.8rem;">📷</span>
+          Frigate no disponible
+        </div>
+        <!-- Play overlay -->
+        <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+                    opacity:0; background:rgba(0,0,0,0.3); transition:opacity 0.15s;"
+             onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">
+          <div style="background:rgba(255,255,255,0.9); border-radius:50%; width:48px; height:48px;
+                      display:flex; align-items:center; justify-content:center; font-size:1.2rem;">▶</div>
+        </div>
+      </div>
+      <!-- Info -->
+      <div style="padding:0.85rem 1rem;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
+          <div>
+            <strong style="font-size:0.95rem;">{{ cam.name }}</strong>
+            <div style="font-size:0.78rem; color:#a0aec0; margin-top:2px;">
+              {% if cam.type == "usb" %}<span class="badge badge-online">USB</span>
+              {% else %}<span class="badge badge-processing">RTSP</span>{% endif %}
+              {{ cam.width }}×{{ cam.height }} · {{ cam.fps }} fps
+            </div>
+          </div>
           <form method="post" action="/cameras/{{ cam.name }}/delete"
-                onsubmit="return confirm('¿Eliminar la cámara {{ cam.name }}?')">
-            <button type="submit" class="btn btn-danger">Eliminar</button>
+                onsubmit="return confirm('¿Eliminar {{ cam.name }}?')">
+            <button type="submit" class="btn btn-danger"
+                    style="padding:0.25rem 0.6rem; font-size:0.78rem;">Eliminar</button>
           </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        </div>
+        <div style="font-family:monospace; font-size:0.75rem; color:#718096; margin-top:0.4rem;
+                    word-break:break-all;">{{ cam.path }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
   {% else %}
   <div class="empty-state">
     <div class="icon">📷</div>
@@ -41,12 +80,13 @@
   {% endif %}
 </div>
 
+<!-- Añadir cámara -->
 <div class="card">
   <h2>Añadir cámara</h2>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="showTab('rtsp', this)">Cámara IP (RTSP)</button>
-    <button class="tab-btn" onclick="showTab('usb', this)">Cámara USB</button>
+    <button class="tab-btn active" onclick="showTab('usb', this)">Cámara USB / webcam</button>
+    <button class="tab-btn" onclick="showTab('rtsp', this)">Cámara IP (RTSP)</button>
   </div>
 
   <form method="post" action="/cameras/add" id="camera-form">
@@ -60,49 +100,72 @@
         <small>Se normalizará a minúsculas sin espacios</small>
       </div>
 
-      <!-- Panel RTSP -->
-      <div id="panel-rtsp" class="form-group form-full">
-        <label for="path-rtsp">URL RTSP de la cámara</label>
-        <input type="text" id="path-rtsp" placeholder="rtsp://usuario:contraseña@192.168.1.100:554/stream">
-        <small>Formato: rtsp://usuario:contraseña@IP:puerto/ruta</small>
-      </div>
-
       <!-- Panel USB -->
-      <div id="panel-usb" class="form-group form-full" style="display:none">
-        <label for="path-usb">Dispositivo USB</label>
-        <select id="path-usb">
-          <option value="/dev/video0">/dev/video0 (predeterminado)</option>
-          <option value="/dev/video1">/dev/video1</option>
-          <option value="/dev/video2">/dev/video2</option>
-          <option value="/dev/video4">/dev/video4</option>
-        </select>
-        <small>Conecta la cámara antes de añadirla</small>
+      <div id="panel-usb" class="form-group form-full">
+        <label>Dispositivo detectado</label>
+        <div id="usb-loading" style="color:#718096; font-size:0.88rem; padding:0.4rem 0;">
+          Buscando cámaras conectadas…
+        </div>
+        <div id="usb-devices" style="display:none;">
+          <div id="device-list" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.5rem;"></div>
+          <!-- Preview de prueba -->
+          <div id="preview-area" style="display:none; margin-top:0.75rem;">
+            <div style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+              <span style="font-size:0.82rem; font-weight:600; color:#4a5568;">Prueba de imagen:</span>
+              <button type="button" id="btn-capture" class="btn btn-secondary"
+                      style="font-size:0.8rem; padding:0.3rem 0.75rem;"
+                      onclick="captureTest()">Capturar foto de prueba</button>
+            </div>
+            <div id="capture-result" style="margin-top:0.75rem; display:none;">
+              <img id="capture-img" src="" alt="Prueba"
+                   style="max-width:100%; max-height:240px; border-radius:6px; border:1.5px solid #e2e8f0; display:block;">
+              <p id="capture-error" style="color:#e53e3e; font-size:0.82rem; margin-top:0.4rem; display:none;"></p>
+            </div>
+          </div>
+        </div>
+        <div id="usb-empty" style="display:none;">
+          <div class="alert-banner alert-info" style="margin:0;">
+            No se detectaron cámaras USB conectadas.
+            <button type="button" onclick="loadUSBDevices()" class="btn btn-secondary"
+                    style="padding:0.2rem 0.6rem; font-size:0.8rem; margin-left:0.5rem;">
+              Buscar de nuevo
+            </button>
+          </div>
+        </div>
       </div>
 
-      <!-- Campo hidden que recibe el valor real -->
+      <!-- Panel RTSP -->
+      <div id="panel-rtsp" class="form-group form-full" style="display:none">
+        <label for="path-rtsp">URL RTSP de la cámara</label>
+        <input type="text" id="path-rtsp" autocomplete="off"
+               placeholder="rtsp://usuario:contraseña@192.168.1.100:554/stream">
+        <small>Formato: <code>rtsp://usuario:contraseña@IP:puerto/ruta</code></small>
+      </div>
+
       <input type="hidden" id="path" name="path">
 
       <div class="form-group">
         <label for="width">Ancho (px)</label>
-        <input type="number" id="width" name="width" value="1280" min="320" max="3840" step="1">
+        <input type="number" id="width" name="width" value="1280" min="320" max="3840">
       </div>
 
       <div class="form-group">
         <label for="height">Alto (px)</label>
-        <input type="number" id="height" name="height" value="720" min="240" max="2160" step="1">
+        <input type="number" id="height" name="height" value="720" min="240" max="2160">
       </div>
 
       <div class="form-group">
         <label for="fps">FPS</label>
-        <input type="number" id="fps" name="fps" value="5" min="1" max="30" step="1">
-        <small>5 FPS es suficiente para detección y ahorra recursos</small>
+        <input type="number" id="fps" name="fps" value="5" min="1" max="30">
+        <small>5 FPS es suficiente para detección</small>
       </div>
 
       <div class="form-group" style="align-self:flex-end;">
         <button type="submit" class="btn btn-primary" style="width:100%; padding:0.6rem;">
-          ➕ Añadir cámara
+          Añadir cámara
         </button>
       </div>
+
     </div>
   </form>
 </div>
@@ -110,27 +173,190 @@
 
 {% block scripts %}
 <script>
-  let currentTab = 'rtsp';
+  let currentTab = 'usb';
+  let selectedUsbPath = null;
 
+  // ── Tabs ──────────────────────────────────────────────────────────────────
   function showTab(tab, btn) {
     currentTab = tab;
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('panel-rtsp').style.display = tab === 'rtsp' ? '' : 'none';
     document.getElementById('panel-usb').style.display  = tab === 'usb'  ? '' : 'none';
+    document.getElementById('panel-rtsp').style.display = tab === 'rtsp' ? '' : 'none';
   }
 
+  // ── Detección USB ─────────────────────────────────────────────────────────
+  async function loadUSBDevices() {
+    document.getElementById('usb-loading').style.display = '';
+    document.getElementById('usb-devices').style.display = 'none';
+    document.getElementById('usb-empty').style.display   = 'none';
+
+    try {
+      const resp = await fetch('/api/cameras/scan');
+      const { devices } = await resp.json();
+      document.getElementById('usb-loading').style.display = 'none';
+
+      if (!devices.length) {
+        document.getElementById('usb-empty').style.display = '';
+        return;
+      }
+
+      const list = document.getElementById('device-list');
+      list.innerHTML = '';
+      devices.forEach((dev, i) => {
+        const card = document.createElement('label');
+        card.style.cssText = `
+          display:flex; align-items:center; gap:0.75rem;
+          padding:0.75rem 1rem; border:1.5px solid #e2e8f0; border-radius:8px;
+          cursor:pointer; transition:border-color 0.15s, background 0.15s;
+        `;
+        card.innerHTML = `
+          <input type="radio" name="_usb_dev" value="${dev.path}" style="accent-color:#2b4a8b; width:16px; height:16px; flex-shrink:0;" ${i === 0 ? 'checked' : ''}>
+          <span style="flex:1; font-size:0.88rem;">
+            <strong style="display:block; color:#2d3748;">${dev.label.split('(')[0].trim()}</strong>
+            <span style="color:#a0aec0; font-family:monospace; font-size:0.78rem;">${dev.path}</span>
+          </span>
+        `;
+        const radio = card.querySelector('input');
+        radio.addEventListener('change', () => {
+          selectedUsbPath = dev.path;
+          document.querySelectorAll('#device-list label').forEach(l => {
+            l.style.borderColor = '#e2e8f0';
+            l.style.background  = '';
+          });
+          card.style.borderColor = '#2b4a8b';
+          card.style.background  = '#ebf8ff';
+          // Limpiar preview anterior al cambiar de dispositivo
+          document.getElementById('capture-result').style.display = 'none';
+        });
+        if (i === 0) {
+          selectedUsbPath = dev.path;
+          card.style.borderColor = '#2b4a8b';
+          card.style.background  = '#ebf8ff';
+        }
+        list.appendChild(card);
+      });
+
+      document.getElementById('usb-devices').style.display = '';
+      document.getElementById('preview-area').style.display = '';
+    } catch (e) {
+      document.getElementById('usb-loading').textContent = 'Error al detectar cámaras.';
+    }
+  }
+
+  // ── Captura de prueba ─────────────────────────────────────────────────────
+  async function captureTest() {
+    if (!selectedUsbPath) return;
+    const btn = document.getElementById('btn-capture');
+    const resultDiv = document.getElementById('capture-result');
+    const img = document.getElementById('capture-img');
+    const errP = document.getElementById('capture-error');
+
+    btn.textContent = 'Capturando…';
+    btn.disabled = true;
+    resultDiv.style.display = 'none';
+    errP.style.display = 'none';
+
+    try {
+      const path = encodeURIComponent(selectedUsbPath);
+      const resp = await fetch(`/api/cameras/capture?path=${path}`);
+      if (resp.ok) {
+        const blob = await resp.blob();
+        img.src = URL.createObjectURL(blob);
+        img.style.display = 'block';
+        errP.style.display = 'none';
+      } else {
+        const data = await resp.json().catch(() => ({}));
+        img.style.display = 'none';
+        errP.textContent = data.detail || 'No se pudo capturar imagen del dispositivo.';
+        errP.style.display = 'block';
+      }
+    } catch (e) {
+      img.style.display = 'none';
+      errP.textContent = 'Error de conexión al capturar imagen.';
+      errP.style.display = 'block';
+    } finally {
+      resultDiv.style.display = '';
+      btn.textContent = 'Capturar foto de prueba';
+      btn.disabled = false;
+    }
+  }
+
+  // ── Modal de stream (polling de snapshots) ───────────────────────────────
+  let _streamTimer = null;
+
+  function openStream(name) {
+    const modal = document.getElementById('stream-modal');
+    const img   = document.getElementById('stream-img');
+    const err   = document.getElementById('stream-error');
+    document.getElementById('stream-label').textContent = name;
+
+    img.style.display = 'none';
+    err.style.display = 'none';
+    modal.style.display = 'flex';
+
+    let errors = 0;
+    function fetchFrame() {
+      const next = new Image();
+      next.onload = () => {
+        img.src = next.src;
+        img.style.display = 'block';
+        err.style.display  = 'none';
+        errors = 0;
+      };
+      next.onerror = () => {
+        errors++;
+        if (errors >= 3) {
+          img.style.display = 'none';
+          err.style.display = 'block';
+        }
+      };
+      next.src = `/cameras/${name}/snapshot?t=${Date.now()}`;
+    }
+
+    fetchFrame();
+    _streamTimer = setInterval(fetchFrame, 500);
+    document.addEventListener('keydown', _escClose);
+  }
+
+  function closeModal() {
+    if (_streamTimer) { clearInterval(_streamTimer); _streamTimer = null; }
+    const modal = document.getElementById('stream-modal');
+    document.getElementById('stream-img').src = '';
+    modal.style.display = 'none';
+    document.removeEventListener('keydown', _escClose);
+  }
+
+  function _escClose(e) { if (e.key === 'Escape') closeModal(); }
+
+  document.getElementById('stream-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // ── Submit del formulario ─────────────────────────────────────────────────
   document.getElementById('camera-form').addEventListener('submit', function(e) {
     const pathField = document.getElementById('path');
-    if (currentTab === 'rtsp') {
-      pathField.value = document.getElementById('path-rtsp').value.trim();
+    if (currentTab === 'usb') {
+      if (!selectedUsbPath) { e.preventDefault(); alert('Selecciona un dispositivo.'); return; }
+      pathField.value = selectedUsbPath;
     } else {
-      pathField.value = document.getElementById('path-usb').value;
-    }
-    if (!pathField.value) {
-      e.preventDefault();
-      alert('Por favor introduce la URL o selecciona el dispositivo.');
+      const url = document.getElementById('path-rtsp').value.trim();
+      if (!url) { e.preventDefault(); alert('Introduce la URL RTSP.'); return; }
+      pathField.value = url;
     }
   });
+
+  // ── Auto-refresco de thumbnails (cámaras configuradas) ────────────────────
+  function refreshThumbs() {
+    document.querySelectorAll('[id^="thumb-"]').forEach(img => {
+      if (img.style.display === 'none') return;
+      const name = img.id.replace('thumb-', '');
+      img.src = `/cameras/${name}/snapshot?t=${Date.now()}`;
+    });
+  }
+  setInterval(refreshThumbs, 5000);
+
+  // Cargar dispositivos USB al abrir la página
+  loadUSBDevices();
 </script>
 {% endblock %}

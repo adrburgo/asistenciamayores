@@ -5,7 +5,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     alsa-utils \
     libsndfile1 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Instalar piper TTS como binario (multi-arquitectura)
+RUN ARCH=$(uname -m) && \
+    PIPER_ARCH=$([ "$ARCH" = "aarch64" ] && echo "aarch64" || echo "x86_64") && \
+    curl -fsSL "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_${PIPER_ARCH}.tar.gz" \
+    | tar -xzC /usr/local/lib && \
+    ln -sf /usr/local/lib/piper/piper /usr/local/bin/piper
 
 WORKDIR /app
 COPY requirements.txt .

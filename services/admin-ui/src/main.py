@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from .mqtt_status import StatusCollector
-from .routes import cameras, contacts, system
+from .routes import alerts, cameras, contacts, settings, system
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -17,6 +17,8 @@ app.mount("/static", StaticFiles(directory="/app/src/static"), name="static")
 app.include_router(system.router)
 app.include_router(cameras.router)
 app.include_router(contacts.router)
+app.include_router(alerts.router)
+app.include_router(settings.router)
 
 
 @app.on_event("startup")
